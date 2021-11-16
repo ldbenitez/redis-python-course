@@ -22,7 +22,9 @@ class SiteStatsDaoRedis(SiteStatsDaoBase, RedisDaoBase):
         super().__init__(*args, **kwargs)
         self.compare_and_update_script = CompareAndUpdateScript(self.redis)
 
-    def find_by_id(self, site_id: int, day: datetime.datetime = None,
+    def find_by_id(self,
+                   site_id: int,
+                   day: datetime.datetime = None,
                    **kwargs) -> SiteStats:
         if day is None:
             day = datetime.datetime.now()
@@ -53,15 +55,25 @@ class SiteStatsDaoRedis(SiteStatsDaoBase, RedisDaoBase):
         if not max_capacity or reading.current_capacity > float(max_capacity):
             self.redis.hset(key, SiteStats.MAX_CAPACITY, reading.wh_generated)
 
-    def _update_optimized(self, key: str, meter_reading: MeterReading,
+    def _update_optimized(self,
+                          key: str,
+                          meter_reading: MeterReading,
                           pipeline: redis.client.Pipeline = None) -> None:
         execute = False
         if pipeline is None:
             pipeline = self.redis.pipeline()
             execute = True
 
-        # START Challenge #3
-        # END Challenge #3
+        self.redis.transaction(
+            self.compare_and_update_script.update_if_greater(pipeline, key,
+                                                             SiteStats.MAX_WH,
+                                                             meter_reading.wh_generated))
+        self.redis.transaction(
+            self.compare_and_update_script.update_if_less(pipeline, key, SiteStats.MIN_WH,
+                                                          meter_reading.wh_generated))
+        self.redis.transaction(
+            self.compare_and_update_script.update_if_greater(
+                pipeline, key, SiteStats.MAX_CAPACITY, meter_reading.current_capacity))
 
         if execute:
             pipeline.execute()
@@ -69,9 +81,5 @@ class SiteStatsDaoRedis(SiteStatsDaoBase, RedisDaoBase):
     def update(self, meter_reading: MeterReading, **kwargs) -> None:
         key = self.key_schema.site_stats_key(meter_reading.site_id,
                                              meter_reading.timestamp)
-        # Remove for Challenge #3
-        self._update_basic(key, meter_reading)
-
-        # Uncomment the following two lines for Challenge #3
-        # pipeline = kwargs.get('pipeline')
-        # self._update_optimized(key, meter_reading, pipeline)
+        pipeline = kwargs.get('pipeline')
+        self._update_optimized(key, meter_reading, pipeline)
