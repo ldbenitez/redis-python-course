@@ -91,8 +91,11 @@ class MetricDaoRedis(MetricDaoBase, RedisDaoBase):
 
     def _get_date_from_day_minute(self, date: datetime.datetime,
                                   day_minute: int) -> datetime.datetime:
-        start = datetime.datetime(year=date.year, month=date.month, day=date.day,
-                                  hour=0, minute=0)
+        start = datetime.datetime(year=date.year,
+                                  month=date.month,
+                                  day=date.day,
+                                  hour=0,
+                                  minute=0)
         return start + datetime.timedelta(minutes=day_minute)
 
     def insert(self, meter_reading: MeterReading, **kwargs) -> None:
@@ -117,11 +120,11 @@ class MetricDaoRedis(MetricDaoBase, RedisDaoBase):
                       time: datetime.datetime, pipeline: redis.client.Pipeline):
         """Insert a specific metric."""
         metric_key = self.key_schema.day_metric_key(site_id, unit, time)  # pylint: disable=unused-variable
-        minute_of_day = self._get_day_minute(time) # pylint: disable=unused-variable
+        minute_of_day = self._get_day_minute(time)  # pylint: disable=unused-variable
 
         measureMinute = MeasurementMinute(value, minute_of_day)
         pipeline.zadd(metric_key, {str(measureMinute): minute_of_day})
-        pipeline.expire(metric_key,METRIC_EXPIRATION_SECONDS)
+        pipeline.expire(metric_key, METRIC_EXPIRATION_SECONDS)
 
     def get_recent(self, site_id: int, unit: MetricUnit, time: datetime.datetime,
                    limit: int, **kwargs) -> Deque[Measurement]:
