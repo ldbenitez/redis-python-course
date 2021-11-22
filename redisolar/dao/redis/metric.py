@@ -121,7 +121,7 @@ class MetricDaoRedis(MetricDaoBase, RedisDaoBase):
 
         measureMinute = MeasurementMinute(value, minute_of_day)
         pipeline.zadd(metric_key, {str(measureMinute): minute_of_day})
-        pipeline.expire(metric_key,METRIC_EXPIRATION_SECONDS)
+        pipeline.expire(metric_key, METRIC_EXPIRATION_SECONDS)
 
     def get_recent(self, site_id: int, unit: MetricUnit, time: datetime.datetime,
                    limit: int, **kwargs) -> Deque[Measurement]:
