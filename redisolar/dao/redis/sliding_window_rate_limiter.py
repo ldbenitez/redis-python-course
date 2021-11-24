@@ -1,13 +1,11 @@
-# Uncomment for Challenge #7
-#import datetime
-#import random
+import datetime
+import random
 from redis.client import Redis
 
 from redisolar.dao.base import RateLimiterDaoBase
 from redisolar.dao.redis.base import RedisDaoBase
 from redisolar.dao.redis.key_schema import KeySchema
-# Uncomment for Challenge #7
-#from redisolar.dao.base import RateLimitExceededException
+from redisolar.dao.base import RateLimitExceededException
 
 
 class SlidingWindowRateLimiter(RateLimiterDaoBase, RedisDaoBase):
@@ -24,5 +22,16 @@ class SlidingWindowRateLimiter(RateLimiterDaoBase, RedisDaoBase):
 
     def hit(self, name: str):
         """Record a hit using the rate-limiter."""
-        # START Challenge #7
-        # END Challenge #7
+        pipeline = self.redis.pipeline()
+        key = self.key_schema.sliding_window_rate_limiter_key(name, self.window_size_ms,
+                                                              self.max_hits)
+
+        now = datetime.datetime.utcnow().timestamp() * 1000
+        random_number = random.randint(0, self.max_hits)
+        pipeline.zadd(key, {f"{str(now)}-{random_number}": now})
+        pipeline.zremrangebyscore(key, 0, now - self.window_size_ms)
+        pipeline.zcard(key)
+
+        _, _, hits = pipeline.execute()
+        if hits > self.max_hits:
+            raise RateLimitExceededException()
